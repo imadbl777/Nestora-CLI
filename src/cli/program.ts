@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { typeormCommand } from '../commands/typeorm.command.js';
+import { migrationCommands } from '../commands/migration.command.js';
 
 function readVersion(): string {
   try {
@@ -20,3 +21,6 @@ export const program = new Command()
   .version(readVersion());
 
 program.addCommand(typeormCommand);
+for (const command of migrationCommands) {
+  program.addCommand(command);
+}

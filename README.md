@@ -25,6 +25,10 @@ variables, database config, a TypeORM `DataSource`, migration scripts, and a
 - **Plan → confirm → execute** flow, so you see every change before it's applied.
 - **Validation** — verifies the result files, then runs the project's own build
   script as a compile check (soft-warned if no `build` script exists).
+- **Migration commands** — `nestora migration:generate|run|revert|show` run the
+  TypeORM CLI with zero configuration: the DataSource path and the
+  CommonJS/ESM runner (`typeorm-ts-node-commonjs` vs `typeorm-ts-node-esm`)
+  are resolved from the target project automatically.
 
 ## Usage
 
@@ -80,10 +84,108 @@ npm run migration:generate -- src/database/migrations/TodoItem
 
 # apply pending migrations:
 npm run migration:run
+# npm run migration:revert
 ```
 
 The generate command takes a positional path (not an env variable), so it works
 identically on Windows, macOS, and Linux shells.
+
+## Migrations, the nestora way
+
+You never need to remember the DataSource path or the ts-node runner. Nestora
+wraps the TypeORM CLI with four commands that resolve both automatically from
+your project:
+
+```sh
+npx nestora migration:generate CreateTodos    # diff entities vs DB -> new migration
+npx nestora migration:run                     # apply pending migrations
+npx nestora migration:revert                  # revert the last executed migration
+npx nestora migration:show                    # list applied and pending migrations
+```
+
+Compared to the raw npm scripts, the nestora commands map one-to-one:
+
+| What you want      | Raw (npm script)                              | Nestora                    |
+|--------------------|-----------------------------------------------|----------------------------|
+| Generate           | `npm run migration:generate -- src/database/migrations/CreateTodos` | `npx nestora migration:generate CreateTodos` |
+| Apply              | `npm run migration:run`                       | `npx nestora migration:run` |
+| Revert             | `npm run migration:revert`                    | `npx nestora migration:revert` |
+| List               | (no npm script)                               | `npx nestora migration:show` |
+
+`migration:generate` takes only the migration **name** — no DataSource flag and
+no path. The name is used verbatim as the output path after the timestamp
+(`<timestamp>-<Name>.ts`) and becomes the TypeScript migration class name, so
+`CreateTodos`, `create-todos` and `create_todos` all work. The migrations
+directory is created automatically if missing.
+
+> **How generate works:** it diffs **all** entities under `src/**/*.entity.ts`
+> against your database. The table(s) in the generated SQL come from your
+> entities — the name you pass is only the filename/class. On a fresh database,
+> the first generate captures every entity you've written so far. Nestora no
+> longer ships a demo entity, so nothing you didn't create ends up in a
+> migration.
+
+### Entities → migrations
+
+```
+src/todos/todo.entity.ts                  define the shape of your data
+        │
+        ▼
+npx nestora migration:generate CreateTodos     diff entities against the DB
+        ▼
+src/database/migrations/<ts>-CreateTodos.ts    a snapshot of that change (up + down)
+        │
+        ▼
+npx nestora migration:run                     apply it to the database
+```
+
+Entities describe *what* your data looks like; migrations capture *how the
+schema changed over time* (including the `down()` to undo a change). Nestora
+wires `synchronize: false` in `database.config.ts`, so schema updates are always
+reviewable migration files instead of silent runtime changes.
+
+If the DataSource is missing (e.g. you cloned the repo and ran a migration
+command before `nestora typeorm`), you get a friendly hint instead of a raw
+TypeORM error:
+
+```
+[error] Nestora could not find a TypeORM DataSource at src/database/data-source.ts.
+Run: npx nestora typeorm
+```
+
+### Entities
+
+Both the generated `data-source.ts` (used by the TypeORM CLI) and
+`database.config.ts` (used by the NestJS runtime) load entities automatically
+via a glob: `src/**/*.entity.ts` in development and `dist/**/*.entity.js` after
+a build. So **you never have to register an entity in two places** — drop a new
+`*.entity.ts` anywhere under `src/` and it is picked up by both migrations and
+the running app.
+
+Nestora does not scaffold a demo entity, so `migration:generate` only ever
+diffs what *you* have written. To take an entity to the database:
+
+```ts
+// src/todos/todo.entity.ts
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('todos')
+export class Todo {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  title: string;
+
+  @Column({ default: false })
+  done: boolean;
+}
+```
+
+```sh
+npx nestora migration:generate CreateTodos   # -> CREATE TABLE "todos" (...)
+npx nestora migration:run
+```
 
 ## Development
 
@@ -102,10 +204,13 @@ npm test         # unit + integration tests (integration is opt-in, see below)
 
 - **Unit** — plan builder, AST transformer (empty / populated / missing imports /
   already-configured fixtures), template renderer, project / package-manager /
-  module-system detection.
+  module-system detection, migration command/runner builders and error mapping.
 - **Integration** — scaffolds a real NestJS project into a temp dir, runs the
-  CLI end-to-end against it, asserts it still compiles, and asserts a second run
-  is a no-op. Opt-in because it installs npm packages:
+  CLI end-to-end against it (CommonJS **and** ESM fixtures), asserts it still
+  compiles, and asserts a second run is a no-op. It then exercises the full
+  migration lifecycle through the CLI — `migration:generate CreateTodos`,
+  `migration:show`, `migration:run`, `migration:revert` — against SQLite.
+  Opt-in because it installs npm packages:
 
 ```sh
 # Unix (bash / zsh):

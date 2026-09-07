@@ -23,5 +23,6 @@ export function buildDatabaseConfigContent(context: SetupContext): string {
     databaseType: databaseTypeLiteral(context),
     defaultPort,
     defaultDatabase,
+    moduleSystem: context.moduleSystem,
   });
 }
