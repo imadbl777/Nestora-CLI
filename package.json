@@ -1,0 +1,56 @@
+{
+  "name": "nestora",
+  "version": "0.1.0",
+  "description": "A CLI for configuring and setting up NestJS projects.",
+  "license": "MIT",
+  "bin": {
+    "nestora": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.7.1",
+    "commander": "^15.0.0",
+    "prettier": "^3.9.6",
+    "ts-morph": "^28.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "keywords": [
+    "nestjs",
+    "nest",
+    "nestjs-cli",
+    "cli",
+    "typeorm",
+    "developer-tools",
+    "scaffolding"
+  ],
+  "author": "Imadbl",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imadbl777/Nestora-CLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imadbl777/Nestora-CLI/issues"
+  },
+  "homepage": "https://github.com/imadbl777/Nestora-CLI#readme"
+}
